@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>简易贪吃蛇</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #101522;
+      --panel: #1d2436;
+      --text: #f2f5ff;
+      --snake: #33d17a;
+      --food: #ff6b6b;
+      --grid: #2d3650;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at top, #1b2440, var(--bg));
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+    }
+
+    .game {
+      width: min(92vw, 520px);
+      padding: 16px;
+      background: color-mix(in srgb, var(--panel) 90%, black 10%);
+      border-radius: 16px;
+      box-shadow: 0 16px 40px rgb(0 0 0 / 35%);
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 1rem;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1;
+      background: #0f1422;
+      border-radius: 10px;
+      border: 1px solid #3d4869;
+    }
+
+    .tips {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      opacity: 0.9;
+      line-height: 1.5;
+    }
+
+    .over {
+      margin-top: 8px;
+      font-weight: 700;
+      color: #ffd166;
+      min-height: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <div class="top-bar">
+      <strong>简易贪吃蛇</strong>
+      <span>得分：<span id="score">0</span></span>
+    </div>
+    <canvas id="board" width="400" height="400" aria-label="贪吃蛇游戏"></canvas>
+    <p class="tips">方向键控制移动，吃到红色食物会增长。撞墙或撞到自己则结束，按空格可重新开始。</p>
+    <p id="gameOver" class="over"></p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score");
+    const overEl = document.getElementById("gameOver");
+
+    const tileSize = 20;
+    const tiles = canvas.width / tileSize;
+    const speed = 130;
+
+    let snake;
+    let direction;
+    let nextDirection;
+    let food;
+    let score;
+    let gameOver;
+
+    function resetGame() {
+      snake = [{ x: 10, y: 10 }];
+      direction = { x: 1, y: 0 };
+      nextDirection = direction;
+      food = spawnFood();
+      score = 0;
+      gameOver = false;
+      scoreEl.textContent = score;
+      overEl.textContent = "";
+    }
+
+    function spawnFood() {
+      while (true) {
+        const position = {
+          x: Math.floor(Math.random() * tiles),
+          y: Math.floor(Math.random() * tiles),
+        };
+
+        if (!snake.some((segment) => segment.x === position.x && segment.y === position.y)) {
+          return position;
+        }
+      }
+    }
+
+    function drawGrid() {
+      ctx.strokeStyle = "#222d45";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= tiles; i += 1) {
+        const p = i * tileSize;
+        ctx.beginPath();
+        ctx.moveTo(p, 0);
+        ctx.lineTo(p, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, p);
+        ctx.lineTo(canvas.width, p);
+        ctx.stroke();
+      }
+    }
+
+    function drawSnake() {
+      snake.forEach((segment, index) => {
+        ctx.fillStyle = index === 0 ? "#49f08f" : "#33d17a";
+        ctx.fillRect(segment.x * tileSize + 2, segment.y * tileSize + 2, tileSize - 4, tileSize - 4);
+      });
+    }
+
+    function drawFood() {
+      ctx.fillStyle = "#ff6b6b";
+      ctx.beginPath();
+      ctx.arc(
+        food.x * tileSize + tileSize / 2,
+        food.y * tileSize + tileSize / 2,
+        tileSize / 2.6,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+
+    function moveSnake() {
+      direction = nextDirection;
+      const head = {
+        x: snake[0].x + direction.x,
+        y: snake[0].y + direction.y,
+      };
+
+      const hitWall = head.x < 0 || head.x >= tiles || head.y < 0 || head.y >= tiles;
+      const hitSelf = snake.some((segment) => segment.x === head.x && segment.y === head.y);
+
+      if (hitWall || hitSelf) {
+        gameOver = true;
+        overEl.textContent = "游戏结束！按空格重新开始";
+        return;
+      }
+
+      snake.unshift(head);
+
+      if (head.x === food.x && head.y === food.y) {
+        score += 1;
+        scoreEl.textContent = score;
+        food = spawnFood();
+      } else {
+        snake.pop();
+      }
+    }
+
+    function render() {
+      ctx.fillStyle = "#0f1422";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawFood();
+      drawSnake();
+    }
+
+    function gameLoop() {
+      if (!gameOver) {
+        moveSnake();
+      }
+      render();
+    }
+
+    window.addEventListener("keydown", (event) => {
+      const keyMap = {
+        ArrowUp: { x: 0, y: -1 },
+        ArrowDown: { x: 0, y: 1 },
+        ArrowLeft: { x: -1, y: 0 },
+        ArrowRight: { x: 1, y: 0 },
+      };
+
+      if (event.code === "Space" && gameOver) {
+        resetGame();
+        render();
+        return;
+      }
+
+      const newDirection = keyMap[event.key];
+      if (!newDirection) return;
+
+      const isReverse =
+        newDirection.x === -direction.x &&
+        newDirection.y === -direction.y;
+
+      if (!isReverse) {
+        nextDirection = newDirection;
+      }
+    });
+
+    resetGame();
+    render();
+    setInterval(gameLoop, speed);
+  </script>
+</body>
+</html>
